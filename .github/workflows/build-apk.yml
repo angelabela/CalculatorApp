@@ -28,17 +28,35 @@ jobs:
       - name: Extract Android project
         run: |
           mkdir -p buildsrc
-          ZIP=$(find . -maxdepth 1 -name "*.zip" -print -quit)
+
+          ZIP=$(find . -maxdepth 1 -type f -name "*.zip" -print -quit)
+
           echo "Using ZIP: $ZIP"
+
           unzip -q "$ZIP" -d buildsrc
 
+          echo "Searching for Gradle project..."
+
+          PROJECT_DIR=$(find buildsrc -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1 | xargs dirname)
+
+          echo "Project directory: $PROJECT_DIR"
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Cannot find settings.gradle"
+            find buildsrc -maxdepth 5 -type f
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
       - name: Build APK
-        working-directory: buildsrc
-        run: gradle :app:assembleDebug --no-daemon
+        run: |
+          cd "$PROJECT_DIR"
+          gradle :app:assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NeonCalculatorPro-debug-apk
-          path: buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          path: '${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk'
           if-no-files-found: error
